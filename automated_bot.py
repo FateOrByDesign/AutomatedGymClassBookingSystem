@@ -1,9 +1,10 @@
 import os.path
 
 from selenium import webdriver
+from selenium.common import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import expected_conditions as EC, wait
 from selenium.webdriver.support.wait import  WebDriverWait
 
 class AutomatedBot:
@@ -21,9 +22,10 @@ class AutomatedBot:
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
-        register_button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "Home_heroButton__3eeI3")))
-        register_button.click()
         try:
+            register_button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "Home_heroButton__3eeI3")))
+            register_button.click()
+
             self.wait.until(EC.staleness_of(register_button))
             self.driver.find_element(By.ID, "toggle-login-register").click()
 
@@ -42,12 +44,43 @@ class AutomatedBot:
             # submit
             submit_button = self.driver.find_element(By.ID, "submit-button")
             submit_button.click()
-            try:
-                if self.wait.until(EC.staleness_of(submit_button)):
+
+            if self. wait.until(EC.any_of(EC.presence_of_element_located((By.CLASS_NAME, "Login_errorMessage__5r698")), EC.staleness_of(submit_button))):
+                try:
+                    self.driver.find_element(By.CLASS_NAME, "Login_errorMessage__5r698")
+                    print("Already Registered, Logging in with an existing account....")
+                    self.driver.find_element(By.ID, "toggle-login-register").click()
+                except NoSuchElementException:
                     print("Registration Successful.")
-            except TimeoutException:
-                print("Something went wrong registration process.")
-                self.driver.quit()
+                    # logout
+                    self.driver.find_element(By.ID, "logout-button").click()
+                # login with the created email and password
+                self.login(email, password)
+
+
         except TimeoutException:
-            print("Something went wrong registration process.")
-            self.driver.quit()
+            print("Something went wrong with the registration process.")
+            # self.driver.quit()
+
+    def login(self, email, password):
+        """ login using an existing email and password """
+        login_button = self.wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
+        login_button.click()
+
+        # get hold of email field and send the email through
+        email_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "email")))
+        email_placeholder.clear()
+        email_placeholder.send_keys(email)
+
+        # get hold of the password field and send the password through
+
+        password_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "password")))
+        password_placeholder.clear()
+        password_placeholder.send_keys(password)
+
+        # submit
+        submit_button = self.driver.find_element(By.ID, "submit-button")
+        submit_button.click()
+        print("login Successful!")
+
+

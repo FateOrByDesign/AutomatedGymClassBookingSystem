@@ -19,11 +19,6 @@ def main():
     bot = AutomatedBot(GYM_URL)
     bot.register_as_a_new_user(LOGIN_NAME, LOGIN_EMAIL, LOGIN_PASSWORD)
 
-    time.sleep(5)
-    bot.driver.quit()
-
-
-
 
 if __name__ == "__main__":
     main()

@@ -16,8 +16,11 @@ def main():
     if not LOGIN_PASSWORD: raise ValueError("Something went wrong when loading the LOGIN_PASSWORD")
 
     bot = AutomatedBot(GYM_URL)
-    bot.register_as_a_new_user(LOGIN_NAME, LOGIN_EMAIL, LOGIN_PASSWORD)
+    # bot.register_as_a_new_user(LOGIN_NAME, LOGIN_EMAIL, LOGIN_PASSWORD)
+    bot.login("student@test.com", "password123")
     bot.book_an_upcoming_class("yoga", "0700", "tuesday")
+    bot.booking_stats()
+
 
 
 if __name__ == "__main__":

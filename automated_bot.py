@@ -1,10 +1,11 @@
 import os.path
+from cmath import exp
 
 from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import expected_conditions as EC, expected_conditions
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.wait import  WebDriverWait
 
@@ -133,7 +134,7 @@ class AutomatedBot:
                 if not button.get_attribute("disabled"):
                     button.click()
                     # if not either join the waitlist or book the class
-                    class_status = "Joined waitlist for" if class_to_book.get_attribute("data-user-waitlisted") else "Booked"
+                    class_status = "Joined waitlist for" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
                     print(f"✓ {class_status}: {class_details[0]} Class on, "
                           f"{weekday_of_class_booked}, {month_of_class_booked}"
                           f" {day_of_class_booked}")
@@ -156,4 +157,38 @@ class AutomatedBot:
         except TimeoutException:
             print("Something went wrong when booking the class")
             self.driver.quit()
+
+    def booking_stats(self):
+        """ print booking stats of the automated booking system """
+        # set the class filter to all to get all data
+        select_element = self.driver.find_element(By.ID, "type-filter")
+        select = Select(select_element)
+        select.select_by_value("all")
+
+        # get all buttons
+        buttons = self.driver.find_elements(By.CSS_SELECTOR, "div.ClassCard_cardActions__tVZBm button")
+        button_texts = [button.text for button in buttons]
+
+        classes_booked = 0
+        classes_open_to_book = 0
+        classes_open_to_waitlist = 0
+        classes_waitlisted = 0
+
+        for text in button_texts:
+            if text == "Booked":
+                classes_booked +=1
+            elif text == "Book Class":
+                classes_open_to_book += 1
+            elif text == "Join Waitlist":
+                classes_open_to_waitlist += 1
+            elif text == "Waitlisted":
+                classes_waitlisted += 1
+
+        print("\n")
+        print(f"-------- BOOKING SUMMARY --------\n"
+              f"Classes open for booking: {classes_open_to_book}\n"
+              f"Classes open for waitlists: {classes_open_to_waitlist}\n"
+              f"Classes booked: {classes_booked}\n"
+              f"Waitlists joined: {classes_waitlisted}\n"
+              f"Already booked/waitlisted: {classes_booked + classes_waitlisted}\n")
 

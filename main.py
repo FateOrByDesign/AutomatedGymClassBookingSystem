@@ -1,7 +1,6 @@
 import os
 
 from automated_bot import AutomatedBot
-import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,6 +17,7 @@ def main():
 
     bot = AutomatedBot(GYM_URL)
     bot.register_as_a_new_user(LOGIN_NAME, LOGIN_EMAIL, LOGIN_PASSWORD)
+    bot.book_an_upcoming_class("yoga", "0700", "tuesday")
 
 
 if __name__ == "__main__":

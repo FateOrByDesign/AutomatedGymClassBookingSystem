@@ -23,6 +23,7 @@ class AutomatedBot:
         self.driver.get(url=website_url)
         # set up an explicit wait
         self.wait = WebDriverWait(self.driver, timeout=5)
+        self.automated_classes = []
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
@@ -129,25 +130,30 @@ class AutomatedBot:
                 weekday_of_class_booked = date_to_format.strftime("%a")
                 month_of_class_booked =  date_to_format.strftime("%b")
                 day_of_class_booked = date_to_format.strftime("%d")
+                class_type = class_details[0].title()
 
                 # check if the button isn't disabled
                 if not button.get_attribute("disabled"):
                     button.click()
                     # if not either join the waitlist or book the class
                     class_status = "Joined waitlist for" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
-                    print(f"✓ {class_status}: {class_details[0]} Class on, "
+                    print(f"✓ {class_status}: {class_type} Class on, "
                           f"{weekday_of_class_booked}, {month_of_class_booked}"
                           f" {day_of_class_booked}")
+
+                    self.automated_classes.append(f"• [{"New Booking" if class_status == "Booked" else "New Waitlist"}] "
+                                                  f"{class_type} Class on {weekday_of_class_booked},"
+                                                  f" {month_of_class_booked} {day_of_class_booked} ")
                 # if button is disabled
                 else:
                     # check if the button is disabled because it's already booked
                     if class_to_book.get_attribute("data-user-booked") != "false":
-                        print(f"✓ Already booked: {class_details[0]} Class on, "
+                        print(f"✓ Already booked: {class_type} Class on, "
                               f"{weekday_of_class_booked}, {month_of_class_booked}"
                               f" {day_of_class_booked}")
                     # check if the button is disabled because it's already on a waitlist
                     if class_to_book.get_attribute("data-user-waitlisted") != "false":
-                        print(f"✓ Already on waitlist: " 
+                        print(f"✓ Already on waitlist: {class_type} Class on, " 
                               f"{weekday_of_class_booked}, {month_of_class_booked}"
                               f" {day_of_class_booked}")
             # can't find any classes for the given date, time or class type
@@ -190,5 +196,11 @@ class AutomatedBot:
               f"Classes open for waitlists: {classes_open_to_waitlist}\n"
               f"Classes booked: {classes_booked}\n"
               f"Waitlists joined: {classes_waitlisted}\n"
-              f"Already booked/waitlisted: {classes_booked + classes_waitlisted}\n")
+              f"Already booked/waitlisted: {classes_booked + classes_waitlisted}\n"
+              f"Total Tuesday and Thursday 6pm classes: {len(self.automated_classes)}")
+        print("\n")
+        print("-------- DETAILED CLASS LIS --------")
+        for new_class in self.automated_classes:
+            print(new_class)
+
 

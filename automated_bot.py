@@ -23,7 +23,7 @@ class AutomatedBot:
         self.driver.get(url=website_url)
         # set up an explicit wait
         self.wait = WebDriverWait(self.driver, timeout=5)
-        self.automated_classes = []
+        self.automated_classes = {"Waitlisted": [], "Booked": [] }
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
@@ -136,14 +136,11 @@ class AutomatedBot:
                 if not button.get_attribute("disabled"):
                     button.click()
                     # if not either join the waitlist or book the class
-                    class_status = "Joined waitlist for" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
-                    print(f"✓ {class_status}: {class_type} Class on, "
+                    class_status = "Waitlisted" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
+                    print(f"✓ {"Joined waitlist for" if class_status == "Waitlisted" else "Booked"}: {class_type} Class on, "
                           f"{weekday_of_class_booked}, {month_of_class_booked}"
                           f" {day_of_class_booked}")
-
-                    self.automated_classes.append(f"• [{"New Booking" if class_status == "Booked" else "New Waitlist"}] "
-                                                  f"{class_type} Class on {weekday_of_class_booked},"
-                                                  f" {month_of_class_booked} {day_of_class_booked} ")
+                    self.automated_classes[class_status].append({"class_type": class_type, "weekday_of_class_booked": weekday_of_class_booked, "month_of_class_booked": month_of_class_booked, "day_of_class_booked": day_of_class_booked})
                 # if button is disabled
                 else:
                     # check if the button is disabled because it's already booked
@@ -200,7 +197,24 @@ class AutomatedBot:
               f"Total Tuesday and Thursday 6pm classes: {len(self.automated_classes)}")
         print("\n")
         print("-------- DETAILED CLASS LIS --------")
-        for new_class in self.automated_classes:
-            print(new_class)
+        for class_statuses in self.automated_classes:
+            for booked_class in self.automated_classes[class_statuses]:
+                print(f"• [{"New Booking" if class_statuses == "Booked" else "New Waitlist"}] "
+                 f"{booked_class["class_type"]} Class on {booked_class["weekday_of_class_booked"]},"
+                 f" {booked_class["month_of_class_booked"]} {booked_class['day_of_class_booked']} ")
+
+    def verify_bookings(self):
+        """ Go to my bookings page and verify the bookings with the automated bookings """
+        class_selector = self.driver.find_element(By.ID, "type-filter")
+        # go to my bookings page
+        self.driver.find_element(By.ID, "my-bookings-link").click()
+        try:
+            self.wait.until(EC.staleness_of(class_selector))
+            confirmed_bookings = self.driver.find_elements(By.CLASS_NAME, "MyBookings_bookingCard__VRdrR")
+
+
+        except TimeoutException:
+            print("Something went wrong loading the the my bookings page")
+            self.driver.quit()
 
 

@@ -1,5 +1,4 @@
 import os.path
-from cmath import exp
 
 from selenium import webdriver
 from selenium.common import NoSuchElementException
@@ -129,7 +128,7 @@ class AutomatedBot:
                 date_to_format = datetime(int(class_details[1]), int(class_details[2]), int(class_details[3]))
                 weekday_of_class_booked = date_to_format.strftime("%a")
                 month_of_class_booked =  date_to_format.strftime("%b")
-                day_of_class_booked = date_to_format.strftime("%d")
+                day_of_class_booked = int(date_to_format.strftime("%d"))
                 class_type = class_details[0].title()
 
                 # check if the button isn't disabled
@@ -210,11 +209,34 @@ class AutomatedBot:
         self.driver.find_element(By.ID, "my-bookings-link").click()
         try:
             self.wait.until(EC.staleness_of(class_selector))
-            confirmed_bookings = self.driver.find_elements(By.CLASS_NAME, "MyBookings_bookingCard__VRdrR")
+            confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR, "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
+            confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,"#waitlist-section .MyBookings_bookingCard__VRdrR")
+            # get all the confirmed booked classes
+            booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
+            print(booked_classes)
+            # get all the confirmed waitlisted classes
+            waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
+            print(waitlisted_classes)
+
+            # compare the class data and verify the booking history
 
 
         except TimeoutException:
             print("Something went wrong loading the the my bookings page")
             self.driver.quit()
 
-
+    @staticmethod
+    def loop_through_class_to_get_details(classes):
+        """ loop through the class details create a use-able dict with the data for later"""
+        confirmed_classes = []
+        for confirmed_class in classes:
+            date_scheduled = \
+            confirmed_class.find_element(By.CSS_SELECTOR, "div.MyBookings_bookingDetails__QG0l_ p").text.split(":")[
+                1].split(",")
+            date_scheduled = f"{date_scheduled[0]},{date_scheduled[1]}".strip()
+            class_type = confirmed_class.find_element(By.CSS_SELECTOR, "div.MyBookings_bookingDetails__QG0l_ h3").text
+            confirmed_classes.append({
+                "class_type": class_type,
+                "class_date": date_scheduled}
+            )
+        return confirmed_classes

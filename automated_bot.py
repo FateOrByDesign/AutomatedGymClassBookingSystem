@@ -1,5 +1,5 @@
 import os.path
-from cmath import exp
+from itertools import zip_longest
 
 from selenium import webdriver
 from selenium.common import NoSuchElementException
@@ -23,7 +23,7 @@ class AutomatedBot:
         self.driver.get(url=website_url)
         # set up an explicit wait
         self.wait = WebDriverWait(self.driver, timeout=5)
-        self.automated_classes = []
+        self.automated_classes = {"Waitlisted": [], "Booked": [] }
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
@@ -129,21 +129,22 @@ class AutomatedBot:
                 date_to_format = datetime(int(class_details[1]), int(class_details[2]), int(class_details[3]))
                 weekday_of_class_booked = date_to_format.strftime("%a")
                 month_of_class_booked =  date_to_format.strftime("%b")
-                day_of_class_booked = date_to_format.strftime("%d")
+                day_of_class_booked = int(date_to_format.strftime("%d"))
                 class_type = class_details[0].title()
 
                 # check if the button isn't disabled
                 if not button.get_attribute("disabled"):
+                    self.wait.until(EC.element_to_be_clickable(button))
+                    # Scroll the element to the middle of the viewport
+                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
                     button.click()
+                    self.wait.until(lambda d: button.get_attribute("disabled"))
                     # if not either join the waitlist or book the class
-                    class_status = "Joined waitlist for" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
-                    print(f"✓ {class_status}: {class_type} Class on, "
+                    class_status = "Waitlisted" if class_to_book.get_attribute("data-user-waitlisted") == "true" else "Booked"
+                    print(f"✓ {"Joined waitlist for" if class_status == "Waitlisted" else "Booked"}: {class_type} Class on, "
                           f"{weekday_of_class_booked}, {month_of_class_booked}"
                           f" {day_of_class_booked}")
-
-                    self.automated_classes.append(f"• [{"New Booking" if class_status == "Booked" else "New Waitlist"}] "
-                                                  f"{class_type} Class on {weekday_of_class_booked},"
-                                                  f" {month_of_class_booked} {day_of_class_booked} ")
+                    self.automated_classes[class_status].append({"class_type": class_type, "weekday_of_class_booked": weekday_of_class_booked, "month_of_class_booked": month_of_class_booked, "day_of_class_booked": day_of_class_booked})
                 # if button is disabled
                 else:
                     # check if the button is disabled because it's already booked
@@ -200,7 +201,65 @@ class AutomatedBot:
               f"Total Tuesday and Thursday 6pm classes: {len(self.automated_classes)}")
         print("\n")
         print("-------- DETAILED CLASS LIS --------")
-        for new_class in self.automated_classes:
-            print(new_class)
+        for class_statuses in self.automated_classes:
+            for booked_class in self.automated_classes[class_statuses]:
+                print(f"• [{"New Booking" if class_statuses == "Booked" else "New Waitlist"}] "
+                 f"{booked_class["class_type"]} Class on {booked_class["weekday_of_class_booked"]},"
+                 f" {booked_class["month_of_class_booked"]} {booked_class['day_of_class_booked']} ")
 
+    def verify_bookings(self):
+        """ Go to my bookings page and verify the bookings with the automated bookings """
+        class_selector = self.driver.find_element(By.ID, "type-filter")
+        # go to my bookings page
+        self.driver.find_element(By.ID, "my-bookings-link").click()
+        try:
+            self.wait.until(EC.staleness_of(class_selector))
+            confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR, "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
+            confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,"#waitlist-section .MyBookings_bookingCard__VRdrR")
+            # get all the confirmed booked classes
+            booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
+            print(booked_classes)
+            print()
+            print(self.automated_classes)
+            # get all the confirmed waitlisted classes
+            waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
 
+            # compare the class data and verify the booking history
+            print("\n")
+            print("-------- VERIFYING ON MY BOOKINGS PAGE --------")
+            print("--- Booked classes ---")
+            self.compare_class_details(self.automated_classes["Booked"], booked_classes)
+            print()
+            print("--- Waitlisted classes ---")
+            self.compare_class_details(self.automated_classes["Waitlisted"], waitlisted_classes)
+
+        except TimeoutException:
+            print("Something went wrong loading the the my bookings page")
+            self.driver.quit()
+
+    @staticmethod
+    def loop_through_class_to_get_details(classes):
+        """ loop through the class details create a use-able dict with the data for later"""
+        confirmed_classes = []
+        for confirmed_class in classes:
+            date_scheduled = confirmed_class.find_element(By.CSS_SELECTOR, "div.MyBookings_bookingDetails__QG0l_ p").text.split(":")[1].split(",")
+            date_scheduled = f"{date_scheduled[0]},{date_scheduled[1]}".strip()
+            class_type = confirmed_class.find_element(By.CSS_SELECTOR, "div.MyBookings_bookingDetails__QG0l_ h3").text.strip().split(" ")[0]
+            confirmed_classes.append({
+                "class_type": class_type,
+                "class_date": date_scheduled}
+            )
+        return confirmed_classes
+
+    @staticmethod
+    def compare_class_details(automated_classes, confirmed_classes):
+        for automated_class in automated_classes:
+            class_type = automated_class["class_type"].title()
+            class_date = f"{automated_class["weekday_of_class_booked"]}, {automated_class["month_of_class_booked"]} {automated_class["day_of_class_booked"]}"
+            for confirmed_class in confirmed_classes:
+                if (confirmed_class.get("class_type")).title() == class_type and confirmed_class.get(
+                        "class_date") == class_date:
+                    print(f"✓ Verified: {confirmed_class.get("class_type")} Class on {confirmed_class.get("class_date")}.")
+                    break
+            else:
+                print(f"❌ MISMATCH: Verification Failed with {class_type} Class on {class_date}.")

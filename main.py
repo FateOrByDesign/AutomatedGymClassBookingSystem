@@ -18,9 +18,12 @@ def main():
     bot = AutomatedBot(GYM_URL)
     bot.register_as_a_new_user(LOGIN_NAME, LOGIN_EMAIL, LOGIN_PASSWORD)
     # bot.login("student@test.com", "password123")
-    bot.book_an_upcoming_class("all", "1800", "tuesday")
+    bot.book_an_upcoming_class("all", "0700", "thursday")
     bot.book_an_upcoming_class("all", "1800", "wednesday")
-    bot.booking_stats()
+    bot.book_an_upcoming_class("all", "1900", "friday")
+    bot.book_an_upcoming_class("all", "1900", "wednesday")
+    bot.book_an_upcoming_class("all", "0800", "saturday")
+    # bot.booking_stats()
     bot.verify_bookings()
 
 

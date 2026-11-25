@@ -95,6 +95,7 @@ class AutomatedBot:
         # select the desired class
         try:
             select_element = self.wait.until(EC.presence_of_element_located((By.ID, "type-filter")))
+            today_date = self.driver.find_element(By.CSS_SELECTOR,".Schedule_dayGroup__y79__ .ClassCard_card__KpCx5").get_attribute("id").split("-")[3:6]
             select = Select(select_element)
             select.select_by_value(class_type)
 
@@ -103,7 +104,7 @@ class AutomatedBot:
 
             # calculate how many day to add from the current day to find the next tuesday
             weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-            today_weekday = datetime.now().strftime("%A")
+            today_weekday = datetime(int(today_date[0]), int(today_date[1]), int(today_date[2])).strftime("%A")
             today_index = weekdays.index(today_weekday)
             days_to_add = (weekdays.index(weekday.title())-today_index) % 7
             # skip if today is tuesday (because you can only book a week in advance)

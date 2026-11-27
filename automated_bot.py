@@ -5,7 +5,7 @@ from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC, expected_conditions
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.wait import  WebDriverWait
 
@@ -22,8 +22,9 @@ class AutomatedBot:
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.get(url=website_url)
         # set up an explicit wait
-        self.wait = WebDriverWait(self.driver, timeout=15)
+        self.wait = WebDriverWait(self.driver, timeout=10)
         self.automated_classes = {"Waitlisted": [], "Booked": [] }
+        self.classes_that_got_booked_with_no_update = []
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
@@ -71,24 +72,28 @@ class AutomatedBot:
 
     def login(self, email, password):
         """ login using an existing email and password """
-        login_button = self.wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
-        login_button.click()
+        try:
+            login_button = self.wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
+            login_button.click()
 
-        # get hold of email field and send the email through
-        email_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "email")))
-        email_placeholder.clear()
-        email_placeholder.send_keys(email)
+            # get hold of email field and send the email through
+            email_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "email")))
+            email_placeholder.clear()
+            email_placeholder.send_keys(email)
 
-        # get hold of the password field and send the password through
+            # get hold of the password field and send the password through
 
-        password_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "password")))
-        password_placeholder.clear()
-        password_placeholder.send_keys(password)
+            password_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "password")))
+            password_placeholder.clear()
+            password_placeholder.send_keys(password)
 
-        # submit
-        submit_button = self.driver.find_element(By.ID, "submit-button")
-        submit_button.click()
-        print("login Successful!")
+            # submit
+            submit_button = self.driver.find_element(By.ID, "submit-button")
+            submit_button.click()
+            self.wait.until(EC.staleness_of(submit_button))
+            print("login Successful!")
+        except TimeoutException:
+            raise RuntimeError("Error: Something went wrong while loging in......")
 
     def book_an_upcoming_class(self, class_type, time, weekday):
         """ Book an upcoming class according to the given time and class_type"""
@@ -121,7 +126,7 @@ class AutomatedBot:
                 if time == item.split("-")[-1]:
                     class_to_book = self.driver.find_element(By.ID, item)
                     break
-            # if a class is found
+
             if class_to_book is not None:
                 button = class_to_book.find_element(By.TAG_NAME, "button")
 
@@ -133,12 +138,31 @@ class AutomatedBot:
                 day_of_class_booked = int(date_to_format.strftime("%d"))
                 class_type = class_details[0].title()
 
+                if class_to_book.get_attribute("data-class-id") in self.classes_that_got_booked_with_no_update:
+                    if button.get_attribute("disabled"):
+                        # if not either join the waitlist or book the class
+                        if button.text == "Waitlisted":
+                            class_status = "Waitlisted"
+                        elif button.text == "Booked":
+                            class_status = "Booked"
+
+                        print(
+                            f"✓ {"Joined waitlist for" if class_status == "Waitlisted" else "Booked"}: {class_type} Class on, "
+                            f"{weekday_of_class_booked}, {month_of_class_booked}"
+                            f" {day_of_class_booked}")
+                        self.automated_classes[class_status].append(
+                            {"class_type": class_type, "weekday_of_class_booked": weekday_of_class_booked,
+                             "month_of_class_booked": month_of_class_booked,
+                             "day_of_class_booked": day_of_class_booked})
+                        return
+
                 # check if the button isn't disabled
                 if not button.get_attribute("disabled"):
                     self.wait.until(EC.element_to_be_clickable(button))
                     # Scroll the element to the middle of the viewport
                     self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
                     button.click()
+                    self.classes_that_got_booked_with_no_update.append(class_to_book.get_attribute("data-class-id"))
 
                     # wait until the button text change to either booked or waitlisted
                     button_states = ["Waitlisted", "Booked"]
@@ -172,7 +196,7 @@ class AutomatedBot:
                 print("No such class at that time.")
 
         except TimeoutException:
-            print("Something went wrong when booking the class")
+            raise RuntimeError("Error: Something went wrong when booking the class........")
 
     def booking_stats(self):
         """ print booking stats of the automated booking system """
@@ -218,20 +242,30 @@ class AutomatedBot:
 
     def verify_bookings(self):
         """ Go to my bookings page and verify the bookings with the automated bookings """
-        class_selector = self.driver.find_element(By.ID, "type-filter")
-        # go to my bookings page
-        self.driver.find_element(By.ID, "my-bookings-link").click()
         try:
+            self.driver.find_element(By.ID, "schedule-link").click()
+            class_selector = self.wait.until(EC.presence_of_element_located((By.ID, "type-filter")))
+            # go to my bookings page
+            self.driver.find_element(By.ID, "my-bookings-link").click()
             self.wait.until(EC.staleness_of(class_selector))
-            self.wait.until(EC.presence_of_element_located((By.ID, "confirmed-bookings-section")))
-            confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR, "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
-            self.wait.until(EC.presence_of_element_located((By.ID, "waitlist-section")))
-            confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,"#waitlist-section .MyBookings_bookingCard__VRdrR")
+            if self.wait.until(EC.any_of(EC.presence_of_element_located((By.ID, "confirmed-bookings-section")), EC.presence_of_element_located((By.ID, "waitlist-section")))):
+                confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR,
+                                                                     "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
+                confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,
+                                                                         "#waitlist-section .MyBookings_bookingCard__VRdrR")
+                if confirmed_booked_classes:
+                    # get all the confirmed booked classes
+                    booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
+                else:
+                    booked_classes = []
 
-            # get all the confirmed booked classes
-            booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
-            # get all the confirmed waitlisted classes
-            waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
+                if confirmed_waitlisted_classes:
+                    # get all the confirmed waitlisted classes
+                    waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
+                else:
+                    waitlisted_classes = []
+
+
 
             # compare the class data and verify the booking history
             print("\n")
@@ -253,8 +287,8 @@ class AutomatedBot:
             print(f"❌ MISMATCH: Missing -{miss_matches_found} Waitlisted bookings" if miss_matches_found > 0 else "✅ SUCCESS: All Waitlisted bookings verified!")
 
         except TimeoutException:
-            print("Something went wrong loading the the my bookings page")
-            self.driver.quit()
+            raise RuntimeError("Error: Something went verifying bookings")
+
 
     @staticmethod
     def loop_through_class_to_get_details(classes):

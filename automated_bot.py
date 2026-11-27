@@ -22,7 +22,7 @@ class AutomatedBot:
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.get(url=website_url)
         # set up an explicit wait
-        self.wait = WebDriverWait(self.driver, timeout=15)
+        self.wait = WebDriverWait(self.driver, timeout=10)
         self.automated_classes = {"Waitlisted": [], "Booked": [] }
 
     def register_as_a_new_user(self, name, email, password):
@@ -71,24 +71,28 @@ class AutomatedBot:
 
     def login(self, email, password):
         """ login using an existing email and password """
-        login_button = self.wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
-        login_button.click()
+        try:
+            login_button = self.wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
+            login_button.click()
 
-        # get hold of email field and send the email through
-        email_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "email")))
-        email_placeholder.clear()
-        email_placeholder.send_keys(email)
+            # get hold of email field and send the email through
+            email_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "email")))
+            email_placeholder.clear()
+            email_placeholder.send_keys(email)
 
-        # get hold of the password field and send the password through
+            # get hold of the password field and send the password through
 
-        password_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "password")))
-        password_placeholder.clear()
-        password_placeholder.send_keys(password)
+            password_placeholder = self.wait.until(EC.presence_of_element_located((By.NAME, "password")))
+            password_placeholder.clear()
+            password_placeholder.send_keys(password)
 
-        # submit
-        submit_button = self.driver.find_element(By.ID, "submit-button")
-        submit_button.click()
-        print("login Successful!")
+            # submit
+            submit_button = self.driver.find_element(By.ID, "submit-button")
+            submit_button.click()
+            self.wait.until(EC.staleness_of(submit_button))
+            print("login Successful!")
+        except TimeoutException:
+            raise RuntimeError("Error: Something went wrong while loging in......")
 
     def book_an_upcoming_class(self, class_type, time, weekday):
         """ Book an upcoming class according to the given time and class_type"""
@@ -172,7 +176,7 @@ class AutomatedBot:
                 print("No such class at that time.")
 
         except TimeoutException:
-            print("Something went wrong when booking the class")
+            raise RuntimeError("Error: Something went wrong when booking the class........")
 
     def booking_stats(self):
         """ print booking stats of the automated booking system """
@@ -218,20 +222,30 @@ class AutomatedBot:
 
     def verify_bookings(self):
         """ Go to my bookings page and verify the bookings with the automated bookings """
-        class_selector = self.driver.find_element(By.ID, "type-filter")
-        # go to my bookings page
-        self.driver.find_element(By.ID, "my-bookings-link").click()
         try:
+            self.driver.find_element(By.ID, "schedule-link").click()
+            class_selector = self.wait.until(EC.presence_of_element_located((By.ID, "type-filter")))
+            # go to my bookings page
+            self.driver.find_element(By.ID, "my-bookings-link").click()
             self.wait.until(EC.staleness_of(class_selector))
-            self.wait.until(EC.presence_of_element_located((By.ID, "confirmed-bookings-section")))
-            confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR, "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
-            self.wait.until(EC.presence_of_element_located((By.ID, "waitlist-section")))
-            confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,"#waitlist-section .MyBookings_bookingCard__VRdrR")
+            if self.wait.until(EC.any_of(EC.presence_of_element_located((By.ID, "confirmed-bookings-section")), EC.presence_of_element_located((By.ID, "waitlist-section")))):
+                confirmed_booked_classes = self.driver.find_elements(By.CSS_SELECTOR,
+                                                                     "#confirmed-bookings-section .MyBookings_bookingCard__VRdrR")
+                confirmed_waitlisted_classes = self.driver.find_elements(By.CSS_SELECTOR,
+                                                                         "#waitlist-section .MyBookings_bookingCard__VRdrR")
+                if confirmed_booked_classes:
+                    # get all the confirmed booked classes
+                    booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
+                else:
+                    booked_classes = []
 
-            # get all the confirmed booked classes
-            booked_classes = self.loop_through_class_to_get_details(confirmed_booked_classes)
-            # get all the confirmed waitlisted classes
-            waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
+                if confirmed_waitlisted_classes:
+                    # get all the confirmed waitlisted classes
+                    waitlisted_classes = self.loop_through_class_to_get_details(confirmed_waitlisted_classes)
+                else:
+                    waitlisted_classes = []
+
+
 
             # compare the class data and verify the booking history
             print("\n")
@@ -253,8 +267,8 @@ class AutomatedBot:
             print(f"❌ MISMATCH: Missing -{miss_matches_found} Waitlisted bookings" if miss_matches_found > 0 else "✅ SUCCESS: All Waitlisted bookings verified!")
 
         except TimeoutException:
-            print("Something went wrong loading the the my bookings page")
-            self.driver.quit()
+            raise RuntimeError("Error: Something went verifying bookings")
+
 
     @staticmethod
     def loop_through_class_to_get_details(classes):

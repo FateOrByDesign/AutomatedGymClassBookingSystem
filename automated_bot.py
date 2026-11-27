@@ -5,7 +5,7 @@ from selenium import webdriver
 from selenium.common import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC, expected_conditions
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support.wait import  WebDriverWait
 
@@ -24,6 +24,7 @@ class AutomatedBot:
         # set up an explicit wait
         self.wait = WebDriverWait(self.driver, timeout=10)
         self.automated_classes = {"Waitlisted": [], "Booked": [] }
+        self.classes_that_got_booked_with_no_update = []
 
     def register_as_a_new_user(self, name, email, password):
         """ register as a new user """
@@ -125,7 +126,7 @@ class AutomatedBot:
                 if time == item.split("-")[-1]:
                     class_to_book = self.driver.find_element(By.ID, item)
                     break
-            # if a class is found
+
             if class_to_book is not None:
                 button = class_to_book.find_element(By.TAG_NAME, "button")
 
@@ -137,12 +138,31 @@ class AutomatedBot:
                 day_of_class_booked = int(date_to_format.strftime("%d"))
                 class_type = class_details[0].title()
 
+                if class_to_book.get_attribute("data-class-id") in self.classes_that_got_booked_with_no_update:
+                    if button.get_attribute("disabled"):
+                        # if not either join the waitlist or book the class
+                        if button.text == "Waitlisted":
+                            class_status = "Waitlisted"
+                        elif button.text == "Booked":
+                            class_status = "Booked"
+
+                        print(
+                            f"✓ {"Joined waitlist for" if class_status == "Waitlisted" else "Booked"}: {class_type} Class on, "
+                            f"{weekday_of_class_booked}, {month_of_class_booked}"
+                            f" {day_of_class_booked}")
+                        self.automated_classes[class_status].append(
+                            {"class_type": class_type, "weekday_of_class_booked": weekday_of_class_booked,
+                             "month_of_class_booked": month_of_class_booked,
+                             "day_of_class_booked": day_of_class_booked})
+                        return
+
                 # check if the button isn't disabled
                 if not button.get_attribute("disabled"):
                     self.wait.until(EC.element_to_be_clickable(button))
                     # Scroll the element to the middle of the viewport
                     self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
                     button.click()
+                    self.classes_that_got_booked_with_no_update.append(class_to_book.get_attribute("data-class-id"))
 
                     # wait until the button text change to either booked or waitlisted
                     button_states = ["Waitlisted", "Booked"]
